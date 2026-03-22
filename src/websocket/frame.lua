@@ -1,15 +1,8 @@
 -- Following Websocket RFC: http://tools.ietf.org/html/rfc6455
-local bit = require'websocket.bit'
-local band = bit.band
-local bxor = bit.bxor
-local bor = bit.bor
-local tremove = table.remove
-local srep = string.rep
+
 local ssub = string.sub
 local sbyte = string.byte
 local schar = string.char
-local band = bit.band
-local rshift = bit.rshift
 local tinsert = table.insert
 local tconcat = table.concat
 local mmin = math.min
@@ -47,7 +40,7 @@ local xor_mask = function(encoded,mask,payload)
     local original = {sbyte(encoded,p,last)}
     for i=1,#original do
       local j = (i-1) % 4 + 1
-      transformed[i] = bxor(original[i],mask[j])
+      transformed[i] = original[i] ~ mask[j]
     end
     local xored = schar(unpack(transformed,1,#original))
     tinsert(transformed_arr,xored)
@@ -60,7 +53,7 @@ local encode_header_small = function(header, payload)
 end
 
 local encode_header_medium = function(header, payload, len)
-  return schar(header, payload, band(rshift(len, 8), 0xFF), band(len, 0xFF))
+  return schar(header, payload, ((len >> 8) & 0xFF), (len & 0xFF))
 end
 
 local encode_header_big = function(header, payload, high, low)
@@ -70,24 +63,24 @@ end
 local encode = function(data,opcode,masked,fin)
   local header = opcode or 1-- TEXT is default opcode
   if fin == nil or fin == true then
-    header = bor(header,bit_7)
+    header = (header | bit_7)
   end
   local payload = 0
   if masked then
-    payload = bor(payload,bit_7)
+    payload = (payload | bit_7)
   end
   local len = #data
   local chunks = {}
   if len < 126 then
-    payload = bor(payload,len)
+    payload = (payload | len)
     tinsert(chunks,encode_header_small(header,payload))
   elseif len <= 0xffff then
-    payload = bor(payload,126)
+    payload = (payload | 126)
     tinsert(chunks,encode_header_medium(header,payload,len))
   elseif len < 2^53 then
     local high = mfloor(len/2^32)
     local low = len - high*2^32
-    payload = bor(payload,127)
+    payload = (payload | 127)
     tinsert(chunks,encode_header_big(header,payload,high,low))
   end
   if not masked then
@@ -115,10 +108,10 @@ local decode = function(encoded)
   local high,low
   encoded = ssub(encoded,pos)
   local bytes = 2
-  local fin = band(header,bit_7) > 0
-  local opcode = band(header,bit_0_3)
-  local mask = band(payload,bit_7) > 0
-  payload = band(payload,bit_0_6)
+  local fin = (header & bit_7) > 0
+  local opcode = (header & bit_0_3)
+  local mask = (payload & bit_7) > 0
+  payload = (payload & bit_0_6)
   if payload > 125 then
     if payload == 126 then
       if #encoded < 2 then

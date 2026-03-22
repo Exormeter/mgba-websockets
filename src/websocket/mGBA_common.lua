@@ -40,7 +40,7 @@ local function async_send(sock)
   return send_async, stop
 end
 
-local message_io = function(sock,on_message,on_error)
+local message_io = function(sock, on_message, on_error)
     local last
     local frames = {}
     local first_opcode
@@ -72,7 +72,7 @@ local message_io = function(sock,on_message,on_error)
             tinsert(frames,decoded)
             encoded = rest
             if fin == true then
-                on_message(tconcat(frames),first_opcode)
+                on_message(tconcat(frames), first_opcode)
                 frames = {}
                 first_opcode = nil
             end

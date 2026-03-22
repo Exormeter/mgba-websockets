@@ -1,8 +1,8 @@
 local frame = require'websocket.frame'
 
 return {
-  client = require'websocket.client',
-  server = require'websocket.server',
+  --client = require'websocket.client',
+  server = require'websocket.server_mGBA',
   CONTINUATION = frame.CONTINUATION,
   TEXT = frame.TEXT,
   BINARY = frame.BINARY,

@@ -41,48 +41,52 @@ local function async_send(sock)
 end
 
 local message_io = function(sock, on_message, on_error)
-    local last
-    local frames = {}
-    local first_opcode
+  local last
+  local frames = {}
+  local first_opcode
 
-    sock:add("received", function()
+  local self = {}
 
-        local encoded,err,part = sock:receive(100000)
+  self.receive = function()
 
-        if err then
-            on_error(err)
-            console:error('Error on receive of package occured'..err)
-            sock:close()
-            return
+    local encoded,err,part = sock:receive(100000)
+
+    if err then
+      on_error(err)
+      console:error('Error on receive of package occured'..err)
+      sock:close()
+      return
+    end
+
+    if last then
+      encoded = last..(encoded or part)
+      last = nil
+    else
+      encoded = encoded or part
+    end
+
+    repeat
+      local decoded, fin, opcode, rest = frame.decode(encoded)
+      if decoded then
+        if not first_opcode then
+            first_opcode = opcode
         end
-
-        if last then
-            encoded = last..(encoded or part)
-            last = nil
-        else
-            encoded = encoded or part
+        tinsert(frames,decoded)
+        encoded = rest
+        if fin == true then
+            on_message(tconcat(frames), first_opcode)
+            frames = {}
+            first_opcode = nil
         end
+      end
+    until not decoded
+    if #encoded > 0 then
+      last = encoded
+    end
 
-        repeat
-            local decoded, fin, opcode, rest = frame.decode(encoded)
-            if decoded then
-            if not first_opcode then
-                first_opcode = opcode
-            end
-            tinsert(frames,decoded)
-            encoded = rest
-            if fin == true then
-                on_message(tconcat(frames), first_opcode)
-                frames = {}
-                first_opcode = nil
-            end
-            end
-        until not decoded
-        if #encoded > 0 then
-            last = encoded
-        end
+  end
 
-    end)
+  return self
 
 end
 

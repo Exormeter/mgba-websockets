@@ -123,6 +123,9 @@ local client = function(sock, protocol)
     message_io = require'websocket.mGBA_common'.message_io(sock, on_message, handle_sock_err)
   end
 
+  self.receive = function()
+    message_io.receive()
+  end
 
   return self
 end
@@ -175,103 +178,114 @@ local listen = function(opts)
 
   --////////////////////////////////////////////////////////////////////////////////////////////////////////--
 
-  self.socket_accept = function(listener)
-    local client_sock = listener:accept()
-    if not client_sock then 
-      console:warn("Error when accepting connection")
-      return end
+  self.create_receive_handler = function(sock)
+    return {
+      sock = sock,
+      state = 'handshake',
+      client = nil,
 
-    local callback_id
+      exchange_handshake = function()
+        console:log("Handshake received")
+        local request = {}
+        local last
 
-    callback_id = client_sock:add("received", function()
-      client_sock:remove(callback_id)
-      self.exchange_handshake(client_sock)
-    end)
+        local buffer, error = self.sock:receive(1024)
 
+        repeat
+          local line_end = buffer:find("\r\n", 1, true)
+          local line = buffer:sub(1, line_end - 1)
+
+          buffer = buffer:sub(line_end + 2)
+
+          request[#request+1] = line
+          console:log(line)
+
+        until line == ''
+
+        local upgrade_request = tconcat(request,'\r\n')
+        local response, protocol = handshake.accept_upgrade(upgrade_request, protocols)
+
+        console:log(response)
+
+        if not response then
+          print('Handshake failed, Request:')
+          print(upgrade_request)
+          self.sock:close()
+          return
+        end
+
+        self.accept_client(protocol)
+
+        local index
+
+        local len = #response
+        local sent, err = self.sock:send(response, index)
+
+        if not sent then
+          print('Websocket client closed while handshake',err)
+          self.sock:close()
+        elseif sent ~= len then
+          print('Message was to big to send in one go',err)
+        end
+      end,
+
+      accept_client = function(protocol)
+
+        local protocol_handler
+        local new_client
+        local protocol_index
+
+        if protocol and opts.protocols[protocol] then
+
+          protocol_index = protocol
+          protocol_handler = opts.protocols[protocol]
+
+        elseif opts.default then
+
+          -- true is the 'magic' index for the default handler
+          protocol_index = true
+          protocol_handler = opts.default
+
+        else
+
+          self.sock:close()
+          print('Wrong Protocol',err)
+          return
+
+        end
+        new_client = client(self.sock, protocol_index)
+        clients[protocol_index][new_client] = true
+        protocol_handler(new_client)
+        new_client:start()
+        self.client = new_client
+      end,
+
+      receive = function()
+        if self.state == 'handshake' then
+          self.exchange_handshake()
+          self.state = 'frame'
+        elseif self.state == 'frame' then
+          self.client.receive()
+        end
+      end
+    }
   end
 
-  --////////////////////////////////////////////////////////////////////////////////////////////////////////--
+  self.socket_accept = function(listener)
+    local client_sock = listener:accept()
 
-  self.exchange_handshake = function(client_sock)
-
-    console:log("Handshake received")
-    local request = {}
-    local last
-
-    local buffer, error = client_sock:receive(1024)
-
-    repeat
-      local line_end = buffer:find("\r\n", 1, true)
-      local line = buffer:sub(1, line_end - 1)
-
-      buffer = buffer:sub(line_end + 2)
-
-      request[#request+1] = line
-      console:log(line)
-
-    until line == ''
-
-    local upgrade_request = tconcat(request,'\r\n')
-    local response, protocol = handshake.accept_upgrade(upgrade_request, protocols)
-
-    console:log(response)
-
-    if not response then
-      print('Handshake failed, Request:')
-      print(upgrade_request)
-      client_sock:close()
+    if not client_sock then
+      console:warn("Error when accepting connection")
       return
     end
 
-    --self.accept_client(client_sock, protocol)
+    local handler = self.create_receive_handler(client_sock)
 
-    local index
-
-    local len = #response
-    local sent, err = client_sock:send(response, index)
-
-    if not sent then
-      print('Websocket client closed while handshake',err)
-      client_sock:close()
-    elseif sent ~= len then
-      print('Message was to big to send in one go',err)
-    end
+    client_sock:add("received", function()
+      handler.receive()
+    end)
 
   end
-
-  --////////////////////////////////////////////////////////////////////////////////////////////////////////--
-
-  self.accept_client = function(client_sock, protocol)
-
-      local protocol_handler
-      local new_client
-      local protocol_index
-
-      if protocol and opts.protocols[protocol] then
-
-        protocol_index = protocol
-        protocol_handler = opts.protocols[protocol]
-
-      elseif opts.default then
-
-        -- true is the 'magic' index for the default handler
-        protocol_index = true
-        protocol_handler = opts.default
-
-      else
-
-        client_sock:close()
-        print('Wrong Protocol',err)
-        return
-
-      end
-      new_client = client(client_sock, protocol_index)
-      clients[protocol_index][new_client] = true
-      protocol_handler(new_client)
-      new_client:start()
-  end
-
-  --////////////////////////////////////////////////////////////////////////////////////////////////////////--
 
   return self
 end

@@ -110,7 +110,7 @@ local create_client = function(sock, opts)
       on_close(false, 1000, '')
     end
     if handler._user_on_close then
-      handler._user_on_error(err)
+      handler._user_on_error(handler, err)
     end
   end
 

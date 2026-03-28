@@ -87,8 +87,8 @@ local create_client = function(sock, opts)
   end
 
   local function on_error(s, err)
-    if user_on_error then
-      handler._user_on_error(err)
+    if handler._user_on_error then
+      handler:_user_on_error(err)
     else
       print('Websocket server error', err)
     end

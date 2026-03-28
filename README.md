@@ -1,6 +1,7 @@
 # mGBA-WebSockets
 
-**mGBA-WebSockets** is a lightweight WebSocket server written in pure Lua, designed to run directly inside the mGBA emulator. It allows external clients—such as browsers or CLI tools—to connect to and interact with a running mGBA instance.
+**mGBA-WebSockets** is a lightweight WebSocket server written in pure Lua, designed to run directly inside the mGBA emulator script engine. 
+It allows external clients—such as browsers or CLI tools—to connect to and interact with a running mGBA instance.
 
 The project has **no external dependencies** and works out of the box with mGBA’s scripting environment.
 

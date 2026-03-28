@@ -73,4 +73,3 @@ You can use this project as a starting point for your own scripts:
 ## Limitations
 -	Broadcast to multiple clients is not implemented yet
 - This is my first Lua project, so some parts may not follow typical Lua conventions
--	Depending on usage, socket handling may block if not integrated carefully with the emulator loop

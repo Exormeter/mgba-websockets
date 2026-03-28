@@ -28,6 +28,6 @@ local server = require'websocket'.server.listen
         ws:close()
       end
     )
-    end
+  end
 }
 

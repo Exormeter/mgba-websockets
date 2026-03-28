@@ -1,4 +1,5 @@
 local insert = table.insert
+local remove = table.remove
 
 local listener = {}
 local clients = {}
@@ -11,14 +12,14 @@ local listen = function(opts)
 
   assert(opts and (opts.protocols or opts.default))
 
-  console:log("Start listening on port " .. opts.port)
+  console:log("WS: Start listening on port " .. opts.port)
   listener = socket.bind(nil , opts.port)
 
   if not listener then
-    error("Listening filed with error. Port already in use?")
+    console:error("WS: Listening filed with error. Port already in use?")
     return
   else
-    console:log("Listening...")
+    console:log("WS: Listening...")
   end
 
   listener:add("received", function() self.socket_accept() end)
@@ -44,11 +45,22 @@ local listen = function(opts)
     local client_sock = listener:accept()
 
     if not client_sock then
-      console:warn("Error when accepting connection")
+      console:error("WS: Error when accepting connection")
       return
     end
 
     local client = require('websocket.server_client').create_client(client_sock, opts)
+
+    client:set_on_close(
+      function(handler, was_clean, code, reason)
+        for index, tempClient in ipairs(clients) do
+          if (tempClient == handler) then
+            remove(clients, index)
+          end
+        end
+      end
+    )
+
     insert(clients, client)
 
   end
